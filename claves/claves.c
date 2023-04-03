@@ -29,10 +29,14 @@ int client_init(int argc, char *argv[]) {
     int test;
     struct sockaddr_in server_addr, client_addr;
 	struct hostent *hp;
+    char *port_tuplas;
+    char *ip_tuplas;
 
-	if (argc != 2){
-        printf("Not enough arguments \n");
-        return(0);
+    port_tuplas = getenv("PORT_TUPLAS");
+    ip_tuplas = getenv("IP_TUPLAS");
+    if (port_tuplas == NULL || ip_tuplas == NULL) {
+        printf("Error: no se han encontrado las variables de entorno PORT_TUPLAS o IP_TUPLAS\n");
+        return -1;
     }
 
     sd = socket(AF_INET, SOCK_STREAM, 0);
@@ -41,14 +45,10 @@ int client_init(int argc, char *argv[]) {
 		return -1;
 	}
     // set server address
-	hp = gethostbyname (argv[1]);
-	if (hp == NULL) {
-		perror("gethostbyname");
-		return -1;
-	}
-    memcpy (&(server_addr.sin_addr), hp->h_addr, hp->h_length);
+
    	server_addr.sin_family  = AF_INET;
-   	server_addr.sin_port    = htons(4200);
+   	server_addr.sin_port    = port_tuplas;
+    server_addr.sin_addr.s_addr = inet_addr(ip_tuplas);
     
     err = connect(sd, (struct sockaddr *) &server_addr,  sizeof(server_addr));
 	if (err == -1) {
@@ -61,6 +61,11 @@ int client_init(int argc, char *argv[]) {
 		perror("client: send");
 		return -1;
 	}
+    err = recvMessage(sd, (char *) &test, sizeof(char));
+    if (err == -1){
+        perror("client: recv");
+        return -1;
+    }
     close(sd);
     return 0;
 }
