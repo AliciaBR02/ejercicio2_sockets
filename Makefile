@@ -10,7 +10,7 @@ libclaves.so: $(CLAVES_PATH)/claves.c
 	$(CC) -fPIC -c -o $(CLAVES_PATH)/claves.o $<
 	$(CC) -shared -fPIC -o $@ $(CLAVES_PATH)/claves.o
 
-servidor:  servidor.c operaciones/operaciones.c
+servidor:  servidor.c operaciones/operaciones.c 
 	$(CC)  $(CFLAGS) $^ -o $@.out
 
 cliente: cliente.c libclaves.so
