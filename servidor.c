@@ -5,6 +5,7 @@
 #include "operaciones/operaciones.h"
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include "sockets/sockets.h"
 /*
 // function to process the message and execute the requested operation
 void process_message(struct message *msg) {    

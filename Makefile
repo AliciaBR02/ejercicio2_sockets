@@ -1,5 +1,6 @@
 CC = gcc
 CLAVES_PATH = claves
+SOCKETS_PATH = sockets
 CFLAGS = -lrt
 OBJS = servidor cliente 
 BIN_FILES = servidor cliente
@@ -8,9 +9,9 @@ all: $(OBJS)
 
 libclaves.so: $(CLAVES_PATH)/claves.c
 	$(CC) -fPIC -c -o $(CLAVES_PATH)/claves.o $<
-	$(CC) -shared -fPIC -o $@ $(CLAVES_PATH)/claves.o
+	$(CC) -shared -fPIC -o $@ $(SOCKETS_PATH)/sockets.c $(CLAVES_PATH)/claves.o
 
-servidor:  servidor.c operaciones/operaciones.c 
+servidor:  servidor.c operaciones/operaciones.c sockets/sockets.c
 	$(CC)  $(CFLAGS) $^ -o $@.out
 
 cliente: cliente.c libclaves.so
