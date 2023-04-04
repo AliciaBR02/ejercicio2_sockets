@@ -8,6 +8,9 @@
 #include <sys/types.h>
 #include "../sockets/sockets.h"
 
+//SIZE OF THE STRUCT MESSAGE
+int size = sizeof(int)*3 + sizeof(int8_t)*2 + sizeof(double) + sizeof(char *)*(256+1) + sizeof(int*) + sizeof(double*);
+char buffer[512];
 // auxiliary function to check the length of value1 is correct
 int is_value1_valid(char *value1) {
     if (strlen(value1) > 256) {
@@ -26,7 +29,6 @@ int is_value1_valid(char *value1) {
 int client_init(int argc, char *argv[]) {
     int sd;
     int err;
-    int test;
     struct sockaddr_in server_addr, client_addr;
 	struct hostent *hp;
     char *port_tuplas;
@@ -47,25 +49,29 @@ int client_init(int argc, char *argv[]) {
     // set server address
 
    	server_addr.sin_family  = AF_INET;
-   	server_addr.sin_port    = port_tuplas;
-    server_addr.sin_addr.s_addr = inet_addr(ip_tuplas);
+   	server_addr.sin_port    = htons(atoi(port_tuplas));
+    server_addr.sin_addr.s_addr = inet_addr(strcmp(ip_tuplas, "localhost") == 0 ? "127.0.0.1" : ip_tuplas);
     
     err = connect(sd, (struct sockaddr *) &server_addr,  sizeof(server_addr));
 	if (err == -1) {
 		perror("connect");
 		return -1;
 	}
-    test = 0;
-    err = sendMessage(sd, (char *) &test, sizeof(char));
+    int8_t op = 0;
+    // write op in buffer
+    memcpy(buffer, &op, sizeof(int8_t));
+    memset(buffer + sizeof(int8_t), 0, 512 - sizeof(int8_t));
+    
+    err = sendMessage(sd, buffer, 512);
 	if (err == -1){
 		perror("client: send");
 		return -1;
 	}
-    err = recvMessage(sd, (char *) &test, sizeof(char));
+    /*err = recvMessage(sd, (char *) &op, sizeof(char));
     if (err == -1){
         perror("client: recv");
         return -1;
-    }
+    }*/
     close(sd);
     return 0;
 }

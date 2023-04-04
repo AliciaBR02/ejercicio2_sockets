@@ -1,4 +1,4 @@
 #!/bin/bash
 
 make
-./servidor 8080
+./servidor.out 8080

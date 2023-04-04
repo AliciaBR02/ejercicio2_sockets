@@ -15,4 +15,6 @@ int client_copy_key(int key1, int key2);
 // send and receive functions for both server and client
 int recvMessage(int socket, char *buffer, int len);
 int sendMessage(int socket, char * buffer, int len);
+
+
 #endif
