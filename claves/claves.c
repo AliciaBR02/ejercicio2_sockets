@@ -93,8 +93,12 @@ int client_init() {
 
 int client_set_value(int key, char *value1, int value2, double value3) {
     int err;
+    char res;
     
     err = set_env_variables();
+    if (err == -1) return -1;
+
+    err = is_value1_valid(value1);
     if (err == -1) return -1;
 
     err = set_socket_connection();
@@ -102,7 +106,6 @@ int client_set_value(int key, char *value1, int value2, double value3) {
 
     int key2 = 0;
     sprintf(buffer, "2\n%d\n%d\n%d\n%f\n%s\n", key, key2, value2, value3, value1);
-    char res;
     
     err = sendMessage(sd, buffer, sizeof(buffer) + 1);
 	if (err == -1){
@@ -121,6 +124,7 @@ int client_set_value(int key, char *value1, int value2, double value3) {
 
 int client_get_value(int key, char *value1, int *value2, double *value3) {
     int err;
+    char res;
     
     err = set_env_variables();
     if (err == -1) return -1;
@@ -129,42 +133,144 @@ int client_get_value(int key, char *value1, int *value2, double *value3) {
     if (err == -1) return -1;
 
     sprintf(buffer, "3\n%d\n", key);
-    struct message res;
     
     err = sendMessage(sd, buffer, sizeof(buffer) + 1);
 	if (err == -1){
 		perror("client: send");
 		return -1;
 	}
-    err = recvMessage(sd, buffer, sizeof(buffer));
+    readLine(sd, buffer, sizeof(buffer) + 1);
+    res = atoi(buffer);
+    memset(buffer, 0, sizeof(int) + 1);
+
+    readLine(sd, buffer, sizeof(int) + 1);
+    *value2 = atoi(buffer);
+    memset(buffer, 0, sizeof(int) + 1);
+
+    readLine(sd, buffer, sizeof(double) + 1);
+    *value3 = atof(buffer);
+    memset(buffer, 0, sizeof(double) + 1);
+
+    readLine(sd, buffer, sizeof(char) * (256 + 1));
+    strcpy(value1, buffer);
+    memset(buffer, 0, sizeof(char) * (256 + 1));
+
+    // i receive res, value1, value2, value3
+    close(sd);
+    return res;
+}
+
+int client_modify_value(int key, char *value1, int value2, double value3) {
+    int err;
+    char res;
+    
+    err = set_env_variables();
+    if (err == -1) return -1;
+
+    err = is_value1_valid(value1);
+    if (err == -1) return -1;
+    
+    err = set_socket_connection();
+    if (err == -1) return -1;
+
+    int key2 = 0;
+    sprintf(buffer, "4\n%d\n%d\n%d\n%f\n%s\n", key, key2, value2, value3, value1);
+    
+    err = sendMessage(sd, buffer, sizeof(buffer) + 1);
+	if (err == -1){
+		perror("client: send");
+		return -1;
+	}
+    err = recvMessage(sd, (char *)&res, sizeof(char));
     if (err == -1){
         perror("client: recv");
         return -1;
     }
-    readLine(sd, (char*)&res.res, sizeof(buffer));
-    readLine(sd, (char*)&res.value2, sizeof(buffer));
-    readLine(sd, (char*)&res.value3, sizeof(buffer));
-    readLine(sd, res.value1, sizeof(buffer));
     memset(buffer, 0, sizeof(buffer));
     close(sd);
-    strcpy(value1, res.value1);
-    *value2 = res.value2;
-    *value3 = res.value3;
-    return res.res;
-}
-
-int client_modify_value(int key, char *value1, int value2, double value3) {
-    return 0;
+    return res;
 }
 
 int client_delete_value(int key) {
-    return 0;
+    int err;
+    char res;
+    
+    err = set_env_variables();
+    if (err == -1) return -1;
+
+    err = set_socket_connection();
+    if (err == -1) return -1;
+
+    sprintf(buffer, "5\n%d\n", key);
+    
+    err = sendMessage(sd, buffer, sizeof(buffer) + 1);
+	if (err == -1){
+		perror("client: send");
+		return -1;
+	}
+    err = recvMessage(sd, (char *)&res, sizeof(char));
+    if (err == -1){
+        perror("client: recv");
+        return -1;
+    }
+    memset(buffer, 0, sizeof(buffer));
+    
+    close(sd);
+    return res;
 }
 
 int client_exist(int key) {
-    return 0;
+    int err;
+    char res;
+    
+    err = set_env_variables();
+    if (err == -1) return -1;
+
+    err = set_socket_connection();
+    if (err == -1) return -1;
+
+    sprintf(buffer, "6\n%d\n", key);
+    
+    err = sendMessage(sd, buffer, sizeof(buffer) + 1);
+	if (err == -1){
+		perror("client: send");
+		return -1;
+	}
+    err = recvMessage(sd, (char *)&res, sizeof(char));
+    if (err == -1){
+        perror("client: recv");
+        return -1;
+    }
+    memset(buffer, 0, sizeof(buffer));
+    
+    close(sd);
+    return res;
 }
 
 int client_copy_key(int key1, int key2) {
-    return 0;
+    int err;
+    char res;
+    
+    err = set_env_variables();
+    if (err == -1) return -1;
+
+    err = set_socket_connection();
+    if (err == -1) return -1;
+
+    sprintf(buffer, "5\n%d\n%d\n", key1, key2);
+    
+    err = sendMessage(sd, buffer, sizeof(buffer) + 1);
+	if (err == -1){
+		perror("client: send");
+		return -1;
+	}
+    err = recvMessage(sd, (char *)&res, sizeof(char));
+    if (err == -1){
+        perror("client: recv");
+        return -1;
+    }
+    memset(buffer, 0, sizeof(buffer));
+    
+    close(sd);
+    return res;
 }

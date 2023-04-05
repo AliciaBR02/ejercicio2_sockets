@@ -28,8 +28,9 @@ void process_message(struct message *msg) {
     pthread_cond_signal(&cond_message);
     pthread_mutex_unlock(&mutex_message);
 
-    int err, res, data;
-    struct message msg_data;
+    int err, res;
+    int data = 0;
+
     dprintf(1, "\n\nop received %d\n", msg_resp.op);
     switch (msg_resp.op) {
         case 1:
@@ -39,21 +40,21 @@ void process_message(struct message *msg) {
             res = set_value(msg_resp.key, msg_resp.value1, msg_resp.value2, msg_resp.value3);
             break;
         case 3:
-            msg_data.res = get_value(msg_data.key, msg_data.value1, &msg_data.value2, &msg_data.value3);
+            res = get_value(msg_resp.key, msg_resp.value1, &msg_resp.value2, &msg_resp.value3);
             data = 1;
-            break;/*
+            break;
         case 4:
-            res = modify_value(key, value1, value2, value3);
+            res = modify_value(msg_resp.key, msg_resp.value1, msg_resp.value2, msg_resp.value3);
             break;
         case 5:
-            res = delete_value(key);
+            res = delete_value(msg_resp.key);
             break;
         case 6:
-            res = exist(key);
+            res = exist(msg_resp.key);
             break;
         case 7:
-            res = copy_key(key, key2);
-            break;*/
+            res = copy_key(msg_resp.key, msg_resp.key2);
+            break;
         default:
             res = -1;
             break;
@@ -61,18 +62,21 @@ void process_message(struct message *msg) {
     
     // send the response to the client
     if (data == 1) {
-        sprintf(buffer, "%d\n%d\n%f\n%s\n", msg_data.res, msg_data.value2, msg_data.value3, msg_data.value1);
-        err = sendMessage(s_local, buffer, sizeof(buffer));
+        sprintf(buffer, "%d\n%d\n%f\n%s\n", res, msg_resp.value2, msg_resp.value3, msg_resp.value1);
+        err = sendMessage(s_local, buffer, strlen(buffer) + 1);
         if (err == -1) {
             perror("server: send data");
+            data = 0;
+            return;
         }
-        return;
+    } else {
+        err = sendMessage(s_local, (char *)&res, sizeof(char));
+        if (err == -1){
+            perror("server: send");
+            return;
+        }
     }
-    err = sendMessage(s_local, (char *)&res, sizeof(char));
-    if (err == -1){
-        perror("server: send");
-        return;
-    }
+    // close the socket
     close(s_local);
     pthread_exit(NULL);
 }
@@ -158,39 +162,33 @@ int main(int argc, char *argv[]) {
         //reading op
         readLine(sc, buffer, sizeof(uint16_t) + 1);
         msg.op = atoi(buffer);
-        dprintf(1, "op %d\n", msg.op);
         memset(buffer, 0, 10);
 
         // reading key
         readLine(sc, buffer, sizeof(int) + 1);
         msg.key = atoi(buffer);
-        dprintf(1, "key %d\n", msg.key);
         memset(buffer, 0, 10);
 
         // reading key2
         readLine(sc, buffer, sizeof(int) + 1);
         msg.key2 = atoi(buffer);
-        dprintf(1, "key2 %d\n", msg.key2);
         memset(buffer, 0, 10);
 
         // reading value2
         readLine(sc, buffer, sizeof(int) + 1);
         msg.value2 = atoi(buffer);
-        dprintf(1, "value2: %d\n", msg.value2);
         memset(buffer, 0, 33);
 
 
         // reading value3
         readLine(sc, buffer, sizeof(double) + 1);
         msg.value3 = atof(buffer);
-        dprintf(1, "value3: %f\n", msg.value3);
         memset(buffer, 0, 33);
 
         // reading value1
         readLine(sc, buffer, 257);
         strcpy(msg.value1, buffer);
-        dprintf(1, "value1: %s\n", msg.value1);
-        memset(buffer, 0, 257);
+        memset(buffer, 0, sizeof(buffer));
 
         msg.s = sc;
 
@@ -206,7 +204,6 @@ int main(int argc, char *argv[]) {
 
         // close connection
         //close(sc);
-        dprintf(1,"closed");
     }
     // close socket
     close(sd);

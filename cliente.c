@@ -38,11 +38,11 @@ int main(void) {
     printf("Value1: %s \n", value1);
     printf("Value2: %d \n", value2);
     printf("Value3: %f \n\n", value3);
-    /*
+    
     // testing modify_value
     int test_modify_value = client_modify_value(2, "modified_2", 4, 3.57);
     printf("Modify second element: %d \n", test_modify_value);
-
+    
     // testing delete_value
     int test_delete_value = client_delete_value(3);
     printf("Delete third element: %d \n\n", test_delete_value);
@@ -65,7 +65,7 @@ int main(void) {
 
     // testing set_value for value1 with more than 256 characters
     int test_set_value_wrong_value1 = client_set_value(5, "This is a very long string that should not be accepted by the server because it is longer than 256 charactersThis is a very long string that should not be accepted by the server because it is longer than 256 charactersThis is a very long string that should not be accepted by the server because it is longer than 256 characters", 7, 4.12);
-    printf("Insert fifth element: %d \n", test_set_value_wrong_value1);*/
+    printf("Insert fifth element: %d \n", test_set_value_wrong_value1);
 
     return 0;
 }
