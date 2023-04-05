@@ -7,58 +7,74 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include "sockets/sockets.h"
+#include "mensaje.h"
 
-// threads and mutexes
+// threads and mutexes' global variables
 pthread_cond_t cond_message;
 pthread_mutex_t mutex_message;
 int not_message_copied = 1;
+char buffer[1024];
+
 
 // function to process the message and execute the requested operation
-void process_message(int s) {
-
+void process_message(struct message *msg) {
+    struct message msg_resp = *msg;
     // copy the descriptor to a local variable
     int s_local;
     pthread_mutex_lock(&mutex_message);
     // copy the message to the global variable
-    s_local = (* (int *) s);
+    s_local = msg_resp.s;
     not_message_copied = 0;
     pthread_cond_signal(&cond_message);
     pthread_mutex_unlock(&mutex_message);
 
-    // execute the requested operation
+    int err, res, data;
+    struct message msg_data;
+    dprintf(1, "\n\nop received %d\n", msg_resp.op);
     switch (msg_resp.op) {
         case 1:
-            msg_resp.res = init();
+            res = init();
             break;
         case 2:
-            msg_resp.res = set_value(msg_resp.key, msg_resp.value1, msg_resp.value2, msg_resp.value3);
+            res = set_value(msg_resp.key, msg_resp.value1, msg_resp.value2, msg_resp.value3);
             break;
         case 3:
-            msg_resp.res = get_value(msg_resp.key, msg_resp.value1, &msg_resp.value2, &msg_resp.value3);
-            break;
+            msg_data.res = get_value(msg_data.key, msg_data.value1, &msg_data.value2, &msg_data.value3);
+            data = 1;
+            break;/*
         case 4:
-            msg_resp.res = modify_value(msg_resp.key, msg_resp.value1, msg_resp.value2, msg_resp.value3);
+            res = modify_value(key, value1, value2, value3);
             break;
         case 5:
-            msg_resp.res = delete_value(msg_resp.key);
+            res = delete_value(key);
             break;
         case 6:
-            msg_resp.res = exist(msg_resp.key);
+            res = exist(key);
             break;
         case 7:
-            msg_resp.res = copy_key(msg_resp.key, msg_resp.key2);
-            break;
+            res = copy_key(key, key2);
+            break;*/
         default:
-            msg_resp.res = -1;
+            res = -1;
             break;
     }
     
     // send the response to the client
-    err = sendMessage(s, (char *) &msg_resp, sizeof(struct message));
+    if (data == 1) {
+        sprintf(buffer, "%d\n%d\n%f\n%s\n", msg_data.res, msg_data.value2, msg_data.value3, msg_data.value1);
+        err = sendMessage(s_local, buffer, sizeof(buffer));
+        if (err == -1) {
+            perror("server: send data");
+        }
+        return;
+    }
+    err = sendMessage(s_local, (char *)&res, sizeof(char));
     if (err == -1){
         perror("server: send");
         return;
     }
+    close(s_local);
+    pthread_exit(NULL);
 }
 
 // ESTRUCTURA SOCKET TCP DEL SERVIDOR
@@ -77,7 +93,7 @@ int main(int argc, char *argv[]) {
     int sd; // socket descriptor of the server
     int sc; // socket connection with client
     char *port;
-    //int val;
+    int optval = 1;
 
     if (argc != 2) {
         printf("Not enough arguments\n");
@@ -86,10 +102,11 @@ int main(int argc, char *argv[]) {
     port = argv[1];
     // we create the socket
     if ((sd =  socket(AF_INET, SOCK_STREAM, 0))<0){
-                printf ("SERVER: Error en el socket");
-                return (0);
-        }
+        printf ("SERVER: Error en el socket");
+        return (0);
+    }
     
+    setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, (char*)&optval, sizeof(optval));
     // we initialize the server address
     server_addr.sin_family      = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
@@ -122,11 +139,12 @@ int main(int argc, char *argv[]) {
     pthread_attr_init(&attr);
     // attributes => independent threads
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-
+    struct message msg_received, msg;
 
     // infinite loop waiting for requests
+    
     while (1) {
-        dprintf(1, "waiting for conection...");
+        dprintf(1, "waiting for conection...\n");
 
         // first we connect with the client
         sc = accept(sd, (struct sockaddr *)&client_addr, (socklen_t *)&size);
@@ -134,11 +152,51 @@ int main(int argc, char *argv[]) {
             perror("error: accept");
             return -1;
         }
-        dprintf(1, "accepted connection de IP: %s   Puerto: %d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+        dprintf(1, "accepted connection from IP: %s   Port: %d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
         
-        // then we process the message
-        pthread_create(&thread, &attr, (void *)process_message, (void *)&sd);
+        
+        //reading op
+        readLine(sc, buffer, sizeof(uint16_t) + 1);
+        msg.op = atoi(buffer);
+        dprintf(1, "op %d\n", msg.op);
+        memset(buffer, 0, 10);
 
+        // reading key
+        readLine(sc, buffer, sizeof(int) + 1);
+        msg.key = atoi(buffer);
+        dprintf(1, "key %d\n", msg.key);
+        memset(buffer, 0, 10);
+
+        // reading key2
+        readLine(sc, buffer, sizeof(int) + 1);
+        msg.key2 = atoi(buffer);
+        dprintf(1, "key2 %d\n", msg.key2);
+        memset(buffer, 0, 10);
+
+        // reading value2
+        readLine(sc, buffer, sizeof(int) + 1);
+        msg.value2 = atoi(buffer);
+        dprintf(1, "value2: %d\n", msg.value2);
+        memset(buffer, 0, 33);
+
+
+        // reading value3
+        readLine(sc, buffer, sizeof(double) + 1);
+        msg.value3 = atof(buffer);
+        dprintf(1, "value3: %f\n", msg.value3);
+        memset(buffer, 0, 33);
+
+        // reading value1
+        readLine(sc, buffer, 257);
+        strcpy(msg.value1, buffer);
+        dprintf(1, "value1: %s\n", msg.value1);
+        memset(buffer, 0, 257);
+
+        msg.s = sc;
+
+
+        // then we process the message
+        pthread_create(&thread, &attr, (void *)process_message, (void *)&msg);
         pthread_mutex_lock(&mutex_message);
         while (not_message_copied == 1) {
             pthread_cond_wait(&cond_message, &mutex_message);
@@ -146,9 +204,9 @@ int main(int argc, char *argv[]) {
         not_message_copied = 1;
         pthread_mutex_unlock(&mutex_message);
 
-
         // close connection
-        close(sc);
+        //close(sc);
+        dprintf(1,"closed");
     }
     // close socket
     close(sd);

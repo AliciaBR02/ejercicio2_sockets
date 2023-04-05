@@ -1,10 +1,11 @@
 #ifndef _MENSAJE_H_
 #define _MENSAJE_H_
+#include <stdint.h>
 
 #define MAX 256
 
 struct message {
-    int8_t op;
+    uint16_t op;
     int key;
     int key2;
     char value1[MAX];
@@ -14,6 +15,7 @@ struct message {
     int *ptr2;
     double *ptr3;
     int8_t res;
+    int s;
 };
 
 #endif
