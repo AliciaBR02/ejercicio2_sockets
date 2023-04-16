@@ -11,7 +11,7 @@
 
 // threads and mutexes' global variables
 pthread_cond_t cond_message;
-pthread_mutex_t mutex_message;
+pthread_mutex_t mutex_message, mutex_executing;
 int not_message_copied = 1;
 char buffer[1024];
 
@@ -28,10 +28,11 @@ void process_message(struct message *msg) {
     pthread_cond_signal(&cond_message);
     pthread_mutex_unlock(&mutex_message);
 
+    pthread_mutex_init(&mutex_executing, NULL);
+    pthread_mutex_lock(&mutex_executing);
     int err, res;
     int data = 0;
 
-    dprintf(1, "\n\nop received %d\n", msg_resp.op);
     switch (msg_resp.op) {
         case 1:
             res = init();
@@ -59,7 +60,8 @@ void process_message(struct message *msg) {
             res = -1;
             break;
     }
-    
+    pthread_mutex_unlock(&mutex_executing);
+
     // send the response to the client
     if (data == 1) {
         sprintf(buffer, "%d\n%d\n%f\n%s\n", res, msg_resp.value2, msg_resp.value3, msg_resp.value1);
@@ -92,6 +94,7 @@ void process_message(struct message *msg) {
 int main(int argc, char *argv[]) {
     // si mandamos un double tal cual, se considerará error SLL
     int err;
+    ssize_t err2;
     struct sockaddr_in server_addr,  client_addr;
     socklen_t size;
     int sd; // socket descriptor of the server
@@ -121,6 +124,7 @@ int main(int argc, char *argv[]) {
 			sizeof(server_addr));
 	if (err == -1) {
 		perror("bind");
+        close(sd);
 		return -1;
 	}
     
@@ -128,6 +132,7 @@ int main(int argc, char *argv[]) {
     err = listen(sd, SOMAXCONN);
 	if (err == -1) {
 		perror("listen");
+        close(sd);
 		return -1;
 	}
 
@@ -154,39 +159,77 @@ int main(int argc, char *argv[]) {
         sc = accept(sd, (struct sockaddr *)&client_addr, (socklen_t *)&size);
         if (sc == -1) {
             perror("error: accept");
+            close(sd);
+            close(sc);
             return -1;
         }
         dprintf(1, "accepted connection from IP: %s   Port: %d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
         
         
         //reading op
-        readLine(sc, buffer, sizeof(uint16_t) + 1);
+        err2 = readLine(sc, buffer, sizeof(uint16_t) + 1);
+        if (err2 == -1) {
+            perror("server: read");
+            close(sd);
+            close(sc);
+            return -1;
+        }
         msg.op = atoi(buffer);
         memset(buffer, 0, 10);
 
         // reading key
-        readLine(sc, buffer, sizeof(int) + 1);
+        err2 = readLine(sc, buffer, sizeof(int) + 1);
+        if (err2 == -1) {
+            perror("server: read");
+            close(sd);
+            close(sc);
+            return -1;
+        }
         msg.key = atoi(buffer);
         memset(buffer, 0, 10);
 
         // reading key2
-        readLine(sc, buffer, sizeof(int) + 1);
+        err2 = readLine(sc, buffer, sizeof(int) + 1);
+        if (err2 == -1) {
+            perror("server: read");
+            close(sd);
+            close(sc);
+            return -1;
+        }
         msg.key2 = atoi(buffer);
         memset(buffer, 0, 10);
 
         // reading value2
-        readLine(sc, buffer, sizeof(int) + 1);
+        err2 = readLine(sc, buffer, sizeof(int) + 1);
+        if (err2 == -1) {
+            perror("server: read");
+            close(sd);
+            close(sc);
+            return -1;
+        }
         msg.value2 = atoi(buffer);
         memset(buffer, 0, 33);
 
 
         // reading value3
-        readLine(sc, buffer, sizeof(double) + 1);
+        err2 = readLine(sc, buffer, sizeof(double) + 1);
+        if (err2 == -1) {
+            perror("server: read");
+            close(sd);
+            close(sc);
+            return -1;
+        }
         msg.value3 = atof(buffer);
         memset(buffer, 0, 33);
 
         // reading value1
-        readLine(sc, buffer, 257);
+        err2 = readLine(sc, buffer, 257);
+        if (err2 == -1) {
+            perror("server: read");
+            close(sd);
+            close(sc);
+            return -1;
+        }
         strcpy(msg.value1, buffer);
         memset(buffer, 0, sizeof(buffer));
 

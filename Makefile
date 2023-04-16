@@ -2,8 +2,8 @@ CC = gcc
 CLAVES_PATH = claves
 SOCKETS_PATH = sockets
 CFLAGS = -lrt
-OBJS = servidor cliente 
-BIN_FILES = servidor cliente
+OBJS = servidor cliente cliente2
+BIN_FILES = servidor cliente cliente2
 
 all: $(OBJS)
 
@@ -17,6 +17,8 @@ servidor:  servidor.c operaciones/operaciones.c sockets/sockets.c
 cliente: cliente.c libclaves.so
 	$(CC) -L. -lclaves $(CFLAGS) -o $@.out $< ./libclaves.so -lrt
 
+cliente2: cliente2.c libclaves.so
+	$(CC) -L. -lclaves $(CFLAGS) -o $@.out $< ./libclaves.so -lrt
 clean:
 	rm -f $(BIN_FILES) *.out *.o *.so $(CLAVES_PATH)/*.o data.txt
 

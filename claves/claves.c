@@ -65,7 +65,7 @@ int set_socket_connection() {
 
 int client_init() {
     int err;
-    
+
     err = set_env_variables();
     if (err == -1) return -1;
 
