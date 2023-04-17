@@ -9,10 +9,6 @@
 #include "../sockets/sockets.h"
 #include "../mensaje.h"
 
-//SIZE OF THE STRUCT MESSAGE
-//int size = sizeof(int)*3 + sizeof(int8_t)*2 + sizeof(double) + sizeof(char *)*(256+1) + sizeof(int*) + sizeof(double*);
-//char buffer[512];
-// auxiliary function to check the length of value1 is correct
 char *port_tuplas;
 char *ip_tuplas;
 struct sockaddr_in server_addr, client_addr;
@@ -43,8 +39,7 @@ int set_socket_connection() {
 		printf("Error en socket\n");
 		return -1;
 	}
-    // set server address
-
+    
    	server_addr.sin_family  = AF_INET;
    	server_addr.sin_port    = htons(atoi(port_tuplas));
     server_addr.sin_addr.s_addr = inet_addr(strcmp(ip_tuplas, "localhost") == 0 ? "127.0.0.1" : ip_tuplas);
@@ -61,14 +56,16 @@ int set_socket_connection() {
     2- create the msg struct to be sent
     3- send msg
     4- receive it
-    5- close queues */
+    5- close client socket */
 
 int client_init() {
     int err;
 
+    // obtain the port and ip from the environment variables
     err = set_env_variables();
     if (err == -1) return -1;
 
+    // create the socket and connect it to the server
     err = set_socket_connection();
     if (err == -1) return -1;
 
@@ -95,12 +92,15 @@ int client_set_value(int key, char *value1, int value2, double value3) {
     int err;
     char res;
     
+    // obtain the port and ip from the environment variables
     err = set_env_variables();
     if (err == -1) return -1;
 
+    // check validity of value1
     err = is_value1_valid(value1);
     if (err == -1) return -1;
 
+    // create the socket and connect it to the server
     err = set_socket_connection();
     if (err == -1) return -1;
 
@@ -112,12 +112,12 @@ int client_set_value(int key, char *value1, int value2, double value3) {
 		perror("client: send");
 		return -1;
 	}
+    memset(buffer, 0, sizeof(buffer));
     err = recvMessage(sd, (char *)&res, sizeof(char));
     if (err == -1){
         perror("client: recv");
         return -1;
     }
-    memset(buffer, 0, sizeof(buffer));
     close(sd);
     return res;
 }
@@ -126,9 +126,11 @@ int client_get_value(int key, char *value1, int *value2, double *value3) {
     int err;
     char res;
     
+    // obtain the port and ip from the environment variables
     err = set_env_variables();
     if (err == -1) return -1;
 
+    // create the socket and connect it to the server
     err = set_socket_connection();
     if (err == -1) return -1;
 
@@ -164,12 +166,15 @@ int client_modify_value(int key, char *value1, int value2, double value3) {
     int err;
     char res;
     
+    // obtain the port and ip from the environment variables
     err = set_env_variables();
     if (err == -1) return -1;
 
+    // check validity of value1
     err = is_value1_valid(value1);
     if (err == -1) return -1;
     
+    // create the socket and connect it to the server
     err = set_socket_connection();
     if (err == -1) return -1;
 
@@ -195,9 +200,11 @@ int client_delete_value(int key) {
     int err;
     char res;
     
+    // obtain the port and ip from the environment variables
     err = set_env_variables();
     if (err == -1) return -1;
 
+    // create the socket and connect it to the server
     err = set_socket_connection();
     if (err == -1) return -1;
 
@@ -223,9 +230,11 @@ int client_exist(int key) {
     int err;
     char res;
     
+    // obtain the port and ip from the environment variables
     err = set_env_variables();
     if (err == -1) return -1;
 
+    // create the socket and connect it to the server
     err = set_socket_connection();
     if (err == -1) return -1;
 
@@ -251,9 +260,11 @@ int client_copy_key(int key1, int key2) {
     int err;
     char res;
     
+    // obtain the port and ip from the environment variables
     err = set_env_variables();
     if (err == -1) return -1;
 
+    // create the socket and connect it to the server
     err = set_socket_connection();
     if (err == -1) return -1;
 

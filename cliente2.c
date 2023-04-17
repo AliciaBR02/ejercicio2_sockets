@@ -39,5 +39,6 @@ int main(void) {
     // testing init
     int test_init = client_init();
     printf("Result of init: %d\n\n", test_init);
+    
     return 0;
 }

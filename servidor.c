@@ -10,9 +10,10 @@
 #include "mensaje.h"
 
 // threads and mutexes' global variables
-pthread_cond_t cond_message;
+pthread_cond_t cond_message, cond_executing;
 pthread_mutex_t mutex_message, mutex_executing;
 int not_message_copied = 1;
+int not_executing = 1;
 char buffer[1024];
 
 
@@ -28,10 +29,9 @@ void process_message(struct message *msg) {
     pthread_cond_signal(&cond_message);
     pthread_mutex_unlock(&mutex_message);
 
-    pthread_mutex_init(&mutex_executing, NULL);
-    pthread_mutex_lock(&mutex_executing);
     int err, res;
     int data = 0;
+    pthread_mutex_lock(&mutex_executing);
 
     switch (msg_resp.op) {
         case 1:
@@ -60,10 +60,12 @@ void process_message(struct message *msg) {
             res = -1;
             break;
     }
+    not_executing = 0;
+    pthread_cond_signal(&cond_executing);
     pthread_mutex_unlock(&mutex_executing);
 
     // send the response to the client
-    if (data == 1) {
+    if (data == 1) { // special case for get_value
         sprintf(buffer, "%d\n%d\n%f\n%s\n", res, msg_resp.value2, msg_resp.value3, msg_resp.value1);
         err = sendMessage(s_local, buffer, strlen(buffer) + 1);
         if (err == -1) {
@@ -91,30 +93,33 @@ void process_message(struct message *msg) {
 // 5- Recibir datos
 // 6- Enviar datos
 // 7- Cerrar el socket
+
 int main(int argc, char *argv[]) {
-    // si mandamos un double tal cual, se considerará error SLL
+    // auxiliar variables
     int err;
     ssize_t err2;
+
     struct sockaddr_in server_addr,  client_addr;
     socklen_t size;
     int sd; // socket descriptor of the server
     int sc; // socket connection with client
+
     char *port;
-    int optval = 1;
 
     if (argc != 2) {
         printf("Not enough arguments\n");
         return -1;
     }
-    port = argv[1];
+    port = argv[1]; // port number
+
     // we create the socket
     if ((sd =  socket(AF_INET, SOCK_STREAM, 0))<0){
         printf ("SERVER: Error en el socket");
         return (0);
     }
     
+    int optval = 1;
     setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, (char*)&optval, sizeof(optval));
-    // we initialize the server address
     server_addr.sin_family      = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port        = htons(atoi(port));
@@ -128,6 +133,25 @@ int main(int argc, char *argv[]) {
 		return -1;
 	}
     
+
+    size = sizeof(client_addr);
+
+
+    // ***concurrency***
+
+    pthread_t thread;
+    pthread_attr_t attr;
+
+    // initialize the mutex and condition variables
+    pthread_mutex_init(&mutex_message, NULL);
+    pthread_mutex_init(&mutex_executing, NULL);
+    pthread_cond_init(&cond_message, NULL);
+
+    pthread_attr_init(&attr);
+    // attributes => independent threads
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    struct message msg_received, msg;
+
     // socket starts listening
     err = listen(sd, SOMAXCONN);
 	if (err == -1) {
@@ -135,20 +159,6 @@ int main(int argc, char *argv[]) {
         close(sd);
 		return -1;
 	}
-
-    size = sizeof(client_addr);
-
-    // ***concurrency***
-    pthread_t thread;
-    pthread_attr_t attr;
-    // initialize the mutex and condition variables
-    pthread_mutex_init(&mutex_message, NULL);
-    pthread_cond_init(&cond_message, NULL);
-
-    pthread_attr_init(&attr);
-    // attributes => independent threads
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-    struct message msg_received, msg;
 
     // infinite loop waiting for requests
     
@@ -166,7 +176,7 @@ int main(int argc, char *argv[]) {
         dprintf(1, "accepted connection from IP: %s   Port: %d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
         
         
-        //reading op
+        // reading op
         err2 = readLine(sc, buffer, sizeof(uint16_t) + 1);
         if (err2 == -1) {
             perror("server: read");
@@ -238,6 +248,8 @@ int main(int argc, char *argv[]) {
 
         // then we process the message
         pthread_create(&thread, &attr, (void *)process_message, (void *)&msg);
+
+        // mutex for copying msg and socket descriptor of the client
         pthread_mutex_lock(&mutex_message);
         while (not_message_copied == 1) {
             pthread_cond_wait(&cond_message, &mutex_message);
@@ -245,8 +257,14 @@ int main(int argc, char *argv[]) {
         not_message_copied = 1;
         pthread_mutex_unlock(&mutex_message);
 
-        // close connection
-        //close(sc);
+        // mutex for executing the message
+        pthread_mutex_lock(&mutex_executing);
+        while (not_executing == 1) {
+            pthread_cond_wait(&cond_executing, &mutex_executing);
+        }
+        not_executing = 1;
+        pthread_mutex_unlock(&mutex_executing);
+
     }
     // close socket
     close(sd);
